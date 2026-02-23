@@ -1,0 +1,291 @@
+import java.io.*;
+import java.util.*;
+
+class PlayerScore implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    String name;
+    String difficulty;
+    int encryptedScore;
+
+    public PlayerScore(String name, String difficulty, int encryptedScore) {
+        this.name = name;
+        this.difficulty = difficulty;
+        this.encryptedScore = encryptedScore;
+    }
+}
+
+public class NumberGuessingGame {
+
+    static Scanner sc = new Scanner(System.in);
+    static Random rand = new Random();
+    static final String FILE_NAME = "leaderboard.dat";
+    static final int SECRET_KEY = 13579;
+
+    // Game stats
+    static int roundsPlayed = 0;
+    static int wins = 0;
+    static int losses = 0;
+    static int bestScore = 0;
+    static int totalScore = 0;
+
+    public static void main(String[] args) {
+
+        System.out.println("=======================================");
+        System.out.println("     ULTIMATE NUMBER GUESSING GAME");
+        System.out.println("=======================================");
+
+        System.out.print("Enter your name: ");
+        String playerName = sc.nextLine();
+
+        while (true) {
+
+            System.out.println("\n========= MAIN MENU =========");
+            System.out.println("1. Start Game");
+            System.out.println("2. View Leaderboard");
+            System.out.println("3. Exit");
+            System.out.print("Choose option: ");
+
+            if (!sc.hasNextInt()) {
+                sc.next();
+                continue;
+            }
+
+            int choice = sc.nextInt();
+
+            if (choice == 1) {
+                playGame(playerName);
+            } 
+            else if (choice == 2) {
+                displayLeaderboard();
+            } 
+            else if (choice == 3) {
+                System.out.println("Exiting...");
+                break;
+            } 
+            else {
+                System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    // ================= GAME LOOP =================
+
+    static void playGame(String playerName) {
+
+        boolean playAgain = true;
+
+        while (playAgain) {
+
+            GameResult result = startGame();
+            roundsPlayed++;
+
+            if (result.score > 0) {
+                wins++;
+                totalScore += result.score;
+                bestScore = Math.max(bestScore, result.score);
+                saveScore(playerName, result.difficulty, result.score);
+            } else {
+                losses++;
+            }
+
+            printStatistics();
+
+            System.out.print("\nDo you want to play again? (yes/no): ");
+            sc.nextLine();
+            String choice = sc.nextLine().toLowerCase();
+            playAgain = choice.equals("yes");
+        }
+
+        System.out.println("\nThanks for playing!.....");
+    }
+
+    static class GameResult {
+        int score;
+        String difficulty;
+
+        GameResult(int score, String difficulty) {
+            this.score = score;
+            this.difficulty = difficulty;
+        }
+    }
+
+    static GameResult startGame() {
+
+        System.out.println("\nChoose Difficulty:");
+        System.out.println("1. Easy (1-50, 10 attempts)");
+        System.out.println("2. Medium (1-100, 7 attempts)");
+        System.out.println("3. Hard (1-200, 5 attempts)");
+        System.out.print("Select: ");
+
+        int range = 100;
+        int maxAttempts = 7;
+        int multiplier = 2;
+        String difficulty = "Medium";
+
+        int level = sc.nextInt();
+
+        switch (level) {
+            case 1: range = 50; maxAttempts = 10; multiplier = 1; difficulty = "Easy"; break;
+            case 2: range = 100; maxAttempts = 7; multiplier = 2; difficulty = "Medium"; break;
+            case 3: range = 200; maxAttempts = 5; multiplier = 3; difficulty = "Hard"; break;
+        }
+
+        countdown();
+
+        int number = rand.nextInt(range) + 1;
+        int attempts = 0;
+        long startTime = System.currentTimeMillis();
+        long timeLimit = 30000;
+
+        System.out.println("\nTimer: 30 seconds total!");
+        System.out.println("Guess a number between 1 and " + range);
+
+        while (attempts < maxAttempts) {
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            if (elapsed > timeLimit) {
+                System.out.println("\n⏰ Time's up!");
+                System.out.println("Number was: " + number);
+                return new GameResult(0, difficulty);
+            }
+
+            System.out.print("Enter guess: ");
+
+            if (!sc.hasNextInt()) {
+                sc.next();
+                continue;
+            }
+
+            int guess = sc.nextInt();
+            attempts++;
+
+            if (guess == number) {
+
+                int score = (maxAttempts - attempts + 1) * 10 * multiplier;
+                printRoundSummary(attempts, score);
+                return new GameResult(score, difficulty);
+            }
+
+            if (guess < number)
+                System.out.println("Too low!");
+            else
+                System.out.println("Too high!");
+
+            if (attempts == 3) {
+                System.out.println("\n--- HINT ---");
+                System.out.println("Number is " + (number % 2 == 0 ? "Even" : "Odd"));
+                if (number > range / 2)
+                    System.out.println("Number is greater than " + (range / 2));
+                else
+                    System.out.println("Number is less than or equal to " + (range / 2));
+                System.out.println("------------");
+            }
+
+            System.out.println("Attempts left: " + (maxAttempts - attempts));
+        }
+
+        System.out.println("\n💀 GAME OVER. Number was: " + number);
+        return new GameResult(0, difficulty);
+    }
+
+    static void printRoundSummary(int attempts, int score) {
+
+        String performance;
+
+        if (attempts <= 2) performance = "Excellent!";
+        else if (attempts <= 4) performance = "Good!";
+        else performance = "Average!";
+
+        System.out.println("\nYou guessed it in " + attempts + " attempts.");
+        System.out.println("Performance: " + performance);
+        System.out.println("Round Score: " + score);
+
+        System.out.println("\n----------------------------------");
+        System.out.println("Round Summary");
+        System.out.println("----------------------------------");
+        System.out.println("Round Score: " + score);
+    }
+
+    static void printStatistics() {
+
+        double avgScore = roundsPlayed == 0 ? 0 : (double) totalScore / roundsPlayed;
+
+        System.out.println("\n========== GAME STATISTICS ==========");
+        System.out.println("Rounds Played : " + roundsPlayed);
+        System.out.println("Wins          : " + wins);
+        System.out.println("Losses        : " + losses);
+        System.out.println("Best Score    : " + bestScore);
+        System.out.printf("Average Score : %.2f\n", avgScore);
+        System.out.println("Total Score   : " + totalScore);
+        System.out.println("=====================================");
+    }
+
+    static void countdown() {
+        try {
+            for (int i = 3; i >= 1; i--) {
+                System.out.println(i + "...");
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("GO!\n");
+    }
+
+    // ================= LEADERBOARD =================
+
+    static void saveScore(String name, String difficulty, int score) {
+
+        int encryptedScore = score ^ SECRET_KEY;
+        List<PlayerScore> scores = loadScores();
+        scores.add(new PlayerScore(name, difficulty, encryptedScore));
+
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            oos.writeObject(scores);
+        } catch (IOException e) {
+            System.out.println("Error saving leaderboard.");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static List<PlayerScore> loadScores() {
+
+        File file = new File(FILE_NAME);
+        if (!file.exists()) return new ArrayList<>();
+
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            return (List<PlayerScore>) ois.readObject();
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    static void displayLeaderboard() {
+
+        List<PlayerScore> scores = loadScores();
+
+        if (scores.isEmpty()) {
+            System.out.println("\nNo leaderboard data yet.");
+            return;
+        }
+
+        scores.sort((a, b) -> (b.encryptedScore ^ SECRET_KEY) - (a.encryptedScore ^ SECRET_KEY));
+
+        System.out.println("\n========= SECURE LEADERBOARD =========");
+
+        int rank = 1;
+
+        for (PlayerScore ps : scores) {
+
+            int decryptedScore = ps.encryptedScore ^ SECRET_KEY;
+            String diff = (ps.difficulty == null) ? "null" : ps.difficulty;
+
+            System.out.println(rank + ". " + ps.name + " - " + decryptedScore + " (" + diff + ")");
+            rank++;
+            if (rank > 5) break;
+        }
+
+        System.out.println("======================================");
+    }
+}
